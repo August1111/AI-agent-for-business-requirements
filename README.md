@@ -1,2 +1,1 @@
-# AI-agent-for-business-requirements
-AI agent for business requirements
+AI агент для написания бизнес требований на основании различных файлов (писем в Outlook, текстовых файлов, аудиозаписей встреч)
