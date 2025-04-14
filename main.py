@@ -1,30 +1,23 @@
-import json
-from langchain_core.messages import HumanMessage
-from langgraph.graph import END, MessagesState
-from workflow import build_workflow
-
+from agent.agent  import agent_executor6, memory
+from uuid import uuid4
 
 def main():
-    # Начальное сообщение от пользователя (запрос аналитика)
-    prompt = "Составь бизнес требования по продукту 'LoyaltyProgram', используя данные из переписки, документов и файлов."
-    input_messages = [HumanMessage(prompt)]
+    thread_id = str(uuid4())
+    config = {"configurable": {"thread_id": thread_id}}
 
-    # Создаем начальное состояние для графа (workflow)
-    # В нашем случае состояние представляет собой словарь с ключом "messages"
-    initial_state: MessagesState = {"messages": input_messages}
+    user_prompt = r"Напиши бизнес требования к продукту Монеты. Папка: C:\Users\artem\YandexDisk\AI_Agent_4BT\AI-agent-for-business-requirements\examples"  
+    print("Вызов агента...")
+    agent_executor6.invoke({"input": user_prompt}, config=config)
 
-    # Строим граф (workflow) из узлов: LLM-узел и Tool-узел,
-    # где узлы и переходы определены в модуле workflow.py.
-    graph = build_workflow()
+    print("Чтение состояния памяти...")
+    result = memory.get(config)
 
-    # Запускаем workflow, передавая начальное состояние
-    output_state = graph.invoke(initial_state)
-
-    # Финальный вывод: последний message из состояния
-    final_message = output_state["messages"][-1].content
-    print("Final Output:")
-    print(final_message)
-
-
+    print("Содержимое памяти:")
+    if isinstance(result, dict):
+        for k, v in result.items():
+            print(f"{k}:", v)
+    else:
+        print(result)
+   
 if __name__ == "__main__":
     main()

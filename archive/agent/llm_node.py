@@ -1,11 +1,14 @@
 import json
 from langchain_gigachat.chat_models import GigaChat
 from langchain_core.messages import SystemMessage, AIMessage
+import dotenv
+
+GIGA_KEY = dotenv.get_key('.env', 'GIGA_KEY')
 
 # Создаем объект LLM для модели Gigachat 2 Max.
 # Здесь можно задать max_tokens и другие параметры по необходимости.
 llm = GigaChat(
-        credentials='YmQ0MzIzODMtNzI1Ni00NzRiLWFkMDQtNjRmNDA4MThhYWEzOjdhNmI1YWNiLTA0OWMtNDI2OC1iZmM0LWM3YTRhMzAyZTJiZQ==',  # замените на свой ключ
+        credentials=GIGA_KEY,  # замените на свой ключ
         verify_ssl_certs=False,
         scope="GIGACHAT_API_PERS",
         model="GigaChat-2-Max",
