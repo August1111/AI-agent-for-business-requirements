@@ -11,6 +11,8 @@ import re
 from langchain_core.runnables import RunnableLambda
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field  
+import extract_msg
+from langchain_core.tools import StructuredTool
 
 GIGA_KEY = dotenv.get_key('.env', 'GIGA_KEY')
 
@@ -20,7 +22,7 @@ llm = GigaChat(
         credentials=GIGA_KEY,  # нужно заменить на ключ
         verify_ssl_certs=False,
         scope="GIGACHAT_API_PERS",
-        model="gigachat-max", # выбрал первую модель, а не вторую т.к. при использовании второй происходит переполнение стека 
+        model="GigaChat-Max", # выбрал первую модель, а не вторую т.к. при использовании второй происходит переполнение стека 
         top_p=0.2,
         timeout = 1000
     )
@@ -42,9 +44,20 @@ def data_collector(folder_path: str) -> str:
         combined_content = ""
         for file_name in files:
             file_path = os.path.join(folder_path, file_name)
-            with open(file_path, "r", encoding="utf-8") as f:
-                content = f.read()
-                combined_content += f"{file_name}\n{content}\n\n"
+            
+            if file_name.lower().endswith(".txt"):
+                with open(file_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    combined_content += f"{file_name}\n{content}\n\n"
+            elif file_name.lower().endswith(".msg"):
+                try:
+                    msg = extract_msg.Message(file_path)
+                    msg_subject = msg.subject or ""
+                    msg_body = msg.body or ""
+                    content = f"Subject: {msg_subject}\nBody:\n{msg_body}"
+                    combined_content += f"{file_name}\n{content}\n\n"
+                except Exception as msg_error:
+                    combined_content += f"{file_name}\nОшибка при чтении MSG файла: {msg_error}\n\n"
 
         # print(combined_content.strip())
         return combined_content.strip()
@@ -119,12 +132,11 @@ system_prompt = f"""
 Ты бизнес-аналитик. Всегда действуй строго по инструкции. Ты обязан выполнить все 3 шага инструкции! :
 
 1. Сначала вызывай инструмент 'data_collector', передав ему путь к {folder}
-2. Из тех файлов, которые вернул инструмент 'data_collector', выбери те, которые относятся к продукту {product} и выпиши из них бизнес-требования, если это возможно.
-Результатом выполнения этого шага будет являться список бизнес-требований к продукту с указанием для каждого требования из какого именно файла оно было взято.
+2. Из тех файлов, которые вернул инструмент 'data_collector', выбери только те, которые относятся к продукту {product} и выпиши из них бизнес-требования.
+Результатом выполнения этого шага будет являться список бизнес-требований к продукту {product} с указанием для каждого требования из какого именно файла оно было взято.
 3. Проанализируй список требований, которые ты составил на предыдущем шаге и скомпилируй их в один чёткий и хорошо структурирванный текст. На каждое требование обязательно должна быть ссылка из какого файла оно взято.
 Вызови инструмент 'get_requirements'. Передай ему текст, сформированный на предыдущем шаге и путь к папке: {folder}. 
 
-Никогда не завершай разговор не выполнив все 3 шага. Заверши разговор только после получения результата от работы инструмента 'get_requirements'.
 
 Запрещено писать Python-код, делать предположения, просить уточнений, описывать алгоритмы.
 Ты должен сразу выполнять действия с помощью инструментов.
@@ -141,7 +153,7 @@ processing_chain = prompt| llm.bind_tools(tools)
 # Объявляю отдельный экземпляр класса MemorySaver, а не напрямую передаю MemorySaver в коде создания агента, чтобы можно было гибко смотреть состояния агента.
 memory = MemorySaver()
 
-age_zzz = create_react_agent(processing_chain
+agent_req = create_react_agent(processing_chain
                                     , tools
                                     , checkpointer = memory
                                     )
@@ -153,7 +165,7 @@ config = {"configurable": {"thread_id": thread_id}}
 # Запускаю агент 
 user_prompt = r"Напиши бизнес требования к продукту Монеты. Папка: C:\Users\artem\YandexDisk\AI_Agent_4BT\AI-agent-for-business-requirements\examples"  
 print("Вызов агента...")
-age_zzz.invoke({"input": user_prompt}, config=config)
+agent_req.invoke({"input": user_prompt}, config=config)
 
 print("Чтение состояния памяти...")
 result = memory.get(config)
@@ -163,7 +175,7 @@ if isinstance(result, dict):
     for k, v in result.items():
         print(f"{k}:", v)
 else:
-    print(result)
+    print(result, flush=True)
 
 messages = result.get("channel_values", {}).get("messages", [])
 
@@ -175,6 +187,6 @@ ai_messages = [msg for msg in messages if isinstance(msg, AIMessage)]
 if ai_messages:
     last_ai_message = ai_messages[-1]
     print("Последнее сообщение от модели:")
-    print(last_ai_message.content)
+    print(last_ai_message.content, flush=True)
 else:
     print("AIMessage не найдено.")
